@@ -10,6 +10,9 @@
 % this code is simple version of 
 % {Stagiaires}\Sietze de Haan\MatLab\data_analyse_parameters.mat.
 %
+% HISTORY
+% 2019/04/29 functionized.
+%
 % AUTHOR
 % Aki Kunikoshi
 % 428968@gmail.com
@@ -53,8 +56,10 @@ McRoberts_output = load(strrep(filename, '.mat', '_results.mat'));
 
 % make data structure
 data.requestID = requestID;
-data.results.STSperiod = McRoberts_output.results.report.startEndSTS;
-data.results.shift_sec = verschuiving; % to be removed.
+
+data.output.STSperiod = McRoberts_output.results.report.startEndSTS;
+data.output.shift_sec = verschuiving; % to be removed.
+
 data.samplingFrequency = fs.beide;
 
 data.input.interval = McRoberts_input.mainStruct.interval;
@@ -88,8 +93,8 @@ data.Opti.angles.x2 = Opti_angles.x2;
     
 % extract target trial part from the signal.
 %frames.All = McRoberts_output.results.report.startEndSTS(1)-(verschuiving*fs.beide):McRoberts_output.results.report.startEndSTS(2)-(verschuiving*fs.beide);
-frames.All = data.results.STSperiod(1)-(data.results.shift_sec*data.samplingFrequency)...
-    :data.results.STSperiod(2)-(data.results.shift_sec*data.samplingFrequency);
+frames.All = data.output.STSperiod(1)-(data.output.shift_sec*data.samplingFrequency)...
+    :data.output.STSperiod(2)-(data.output.shift_sec*data.samplingFrequency);
 frames.All = round(frames.All);
             
 % bepaal de lengte van een periode en knip adhv de periode het
@@ -137,50 +142,48 @@ for iFrame = 1:momenten_zitten(1:1)-frames.All(1)-1
 end
 momenten.All(1) = frames.transitie(end);
 
-
-
-
-
 % bepalen tussenliggende transities
 for iSTS = 1:(parameters.Opti.TotaalStS)-1
     frames.transitie = 0;
     for iFrame = momenten_staan(iSTS*2-1,1)-frames.All(1):momenten_staan(iSTS*2,1)-frames.All(1)-1
         frames = nullijn_passage(frames, data.Opti.angles.v2(:,2), iFrame, draw);
     end
-    frames.transitie = Controleer_transitie_bepaling(iSTS, indices.stahoogte, frames.transitie, Opti_angles.v2(:,2), draw);
+    frames.transitie = Controleer_transitie_bepaling(iSTS, indices.stahoogte, frames.transitie, data.Opti.angles.v2(:,2), draw);
     momenten.All(size(momenten.All,1)+1:size(momenten.All,1)+2,1) = [frames.transitie(1); frames.transitie(end)];
 
     frames.transitie = 0;
     for iFrame = momenten_zitten(iSTS*2,1)-frames.All(1):momenten_zitten(iSTS*2+1,1)-frames.All(1)-1
-        frames = nullijn_passage(frames, Opti_angles.v2(:,2), iFrame, draw);
+        frames = nullijn_passage(frames, data.Opti.angles.v2(:,2), iFrame, draw);
     end
-    frames.transitie = Controleer_transitie_bepaling(iSTS+1, indices.zithoogte, frames.transitie, Opti_angles.v2(:,2), draw);
+    frames.transitie = Controleer_transitie_bepaling(iSTS+1, indices.zithoogte, frames.transitie, data.Opti.angles.v2(:,2), draw);
     momenten.All(size(momenten.All,1)+1:size(momenten.All,1)+2,1) = [frames.transitie(1); frames.transitie(end)];
 end
-            
+
 % bepalen laatste einde Sit to Stand en begin Stand to Sit
 frames.transitie = 0;
 for iFrame = momenten_staan(iSTS*2+1,1)-frames.All(1):momenten_staan(iSTS*2+2,1)-frames.All(1)-1
-    frames = nullijn_passage(frames, Opti_angles.v2(:,2), iFrame, draw);
+    frames = nullijn_passage(frames, data.Opti.angles.v2(:,2), iFrame, draw);
 end
-frames.transitie = Controleer_transitie_bepaling(iSTS+1, indices.stahoogte, frames.transitie, Opti_angles.v2(:,2), draw);
+frames.transitie = Controleer_transitie_bepaling(iSTS+1, indices.stahoogte, frames.transitie, data.Opti.angles.v2(:,2), draw);
 momenten.All(size(momenten.All,1)+1:size(momenten.All,1)+2,1) = [frames.transitie(1); frames.transitie(end)];
 
 % bepalen einde trial
 frames.transitie = 0;
 for iFrame = momenten_zitten(iSTS*2+2,1)-frames.All(1):frames.All(end)-frames.All(1)-1
-    frames = nullijn_passage(frames, Opti_angles.v2(:,2), iFrame, draw);
+    frames = nullijn_passage(frames, data.Opti.angles.v2(:,2), iFrame, draw);
 end
-transitieNr = vijf_graden_regel(Opti_angles.x2(:,2), frames.transitie);
+transitieNr = vijf_graden_regel(data.Opti.angles.x2(:,2), frames.transitie);
 momenten.All(size(momenten.All,1)+1,1) = frames.transitie(transitieNr);
             
-            
+
+
 %% parameters berekenen
 % opsplitsen van faseovergangen naar start en stopmomenten
 parameters.Opti = splits_faseovergangen(parameters.Opti, momenten.All);
 
 % berekening Optitrack parameters
-parameters.Opti = Opti_parameters_berekenen(parameters.Opti, McRoberts_output.results.report.startEndSTS(1), verschuiving, fs_beide);
+%parameters.Opti = Opti_parameters_berekenen(parameters.Opti, McRoberts_output.results.report.startEndSTS(1), verschuiving, fs_beide);
+parameters.Opti = Opti_parameters_berekenen(parameters.Opti, data.output.STSperiod(1), data.output.shift_sec, data.samplingFrequency);
 
 % parameters inladen MT
 parameters.MT = MoveTest_parameters_inladen(McRoberts_output.results.database, McRoberts_output.results.report.phases);

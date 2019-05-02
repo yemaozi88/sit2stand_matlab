@@ -29,21 +29,7 @@ drempelwaarde = 0.04; % in meters
 % eerste waarde 'draw' is voor tekenen faseovergangen, 
 % tweede waarde is voor tekenen RMSE romphoek figuren, 
 % derde waarde is tekenen RMSE verticale snelheid figuren.
-draw = [1 0 0];        
-
-% McRoberts_output.results.report.startEndSTS
-
-% McRoberts_input.mainStruct.interval(1,5): '5x STS Slow' or '30sec STS Slow'
-% McRoberts_input.mainStruct.intervals
-% Opti_linear.v2(:,1)
-% Opti_linear.x2
-% Opti_angles.v2(:,2)
-% verschuiving
-% McRoberts_output.results.database
-% McRoberts_output.results.report.phases
-% McRoberts_output.results.report.phases(1,1)
-% McRoberts_output.results.report.phases(end,6)
-
+draw = [1 0 0];
 
 
 %% load data
@@ -56,8 +42,12 @@ McRoberts_output = load(strrep(filename, '.mat', '_results.mat'));
 
 % make data structure
 data.requestID = requestID;
-data.results.STSperiod = McRoberts_output.results.report.startEndSTS;
-data.results.shift_sec = verschuiving; % to be removed.
+
+data.output.STSperiod = McRoberts_output.results.report.startEndSTS;
+data.output.shift_sec = verschuiving; % to be removed.
+data.output.database  = McRoberts_output.results.database;
+data.output.phases    = McRoberts_output.results.report.phases;
+
 data.samplingFrequency = fs.beide;
 
 data.input.interval = McRoberts_input.mainStruct.interval;
@@ -91,8 +81,8 @@ data.Opti.angles.x2 = Opti_angles.x2;
     
 % extract target trial part from the signal.
 %frames.All = McRoberts_output.results.report.startEndSTS(1)-(verschuiving*fs.beide):McRoberts_output.results.report.startEndSTS(2)-(verschuiving*fs.beide);
-frames.All = data.results.STSperiod(1)-(data.results.shift_sec*data.samplingFrequency)...
-    :data.results.STSperiod(2)-(data.results.shift_sec*data.samplingFrequency);
+frames.All = data.output.STSperiod(1)-(data.output.shift_sec*data.samplingFrequency)...
+    :data.output.STSperiod(2)-(data.output.shift_sec*data.samplingFrequency);
 frames.All = round(frames.All);
             
 % bepaal de lengte van een periode en knip adhv de periode het
@@ -174,20 +164,19 @@ transitieNr = vijf_graden_regel(data.Opti.angles.x2(:,2), frames.transitie);
 momenten.All(size(momenten.All,1)+1,1) = frames.transitie(transitieNr);
             
 
+%% parameter calculation
+% this part should be removed because mcroberts_output is used.
 
-
-
-
-
-%% parameters berekenen
 % opsplitsen van faseovergangen naar start en stopmomenten
 parameters.Opti = splits_faseovergangen(parameters.Opti, momenten.All);
 
 % berekening Optitrack parameters
-parameters.Opti = Opti_parameters_berekenen(parameters.Opti, McRoberts_output.results.report.startEndSTS(1), verschuiving, fs_beide);
+%parameters.Opti = Opti_parameters_berekenen(parameters.Opti, McRoberts_output.results.report.startEndSTS(1), verschuiving, fs_beide);
+parameters.Opti = Opti_parameters_berekenen(parameters.Opti, data.output.STSperiod(1), data.output.shift_sec, data.samplingFrequency);
 
 % parameters inladen MT
-parameters.MT = MoveTest_parameters_inladen(McRoberts_output.results.database, McRoberts_output.results.report.phases);
+%parameters.MT = MoveTest_parameters_inladen(McRoberts_output.results.database, McRoberts_output.results.report.phases);
+parameters.MT = MoveTest_parameters_inladen(data.output.database, data.output.phases);
 
 
 %% Aantal STS's MT en Opti vergelijken. NaN invullen bij missende data
