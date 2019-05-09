@@ -1,10 +1,10 @@
-%function parameters = makeGoldStandard_Siete(requestID, trialNum)
-% function parameters = makeGoldStandard_Siete(requestID, trialNum)
+function parameters = makeGoldStandard(data, trialName)
+% function parameters = makeGoldStandard(data, trialName)
 % make Sit-to-Stand phase from OptiTrack.
 % 
 % INPUT
-% requestID:
-% trialNum:
+% - data (struct): can be obtained with workspace2data. 
+% - trialName: {McRoberts_input}.mainStruct.intervals(trialNum, 5);
 % 
 % NOTES:
 % this code is simple version of 
@@ -19,13 +19,6 @@
 %
 
 %% default values
-clear all, fclose all, clc;
-
-requestID = 20121;
-trialNum  = 1;
-settings_Sietze;
-clear dirOut dirSietze fileRequestIDlist
-
 % threshold
 drempelwaarde = 0.04; % in meters
 % eerste waarde 'draw' is voor tekenen faseovergangen, 
@@ -33,43 +26,10 @@ drempelwaarde = 0.04; % in meters
 % derde waarde is tekenen RMSE verticale snelheid figuren.
 draw = [1 0 0];
 
-
-%% load data
-load([dirWorkspace '\workspace' num2str(requestID) '.mat']);
-clear framenr graph_input row
-clear reqID_all iReqID
-clear resample_verhouding
-clear t_MT t_opti t_opti2
-clear coordinaten metadata
-
-filename = [dirMT '\' num2str(requestID) '\' num2str(requestID) '_movetest_ststest_' num2str(trialNum) '.mat'];
-McRoberts_input  = load(filename);
-McRoberts_output = load(strrep(filename, '.mat', '_results.mat'));
-clear dirMT dirWorkspace filename
+settings_Sietze;
+clear dirSietze fileRequestIDlist
 
 
-%% make data structure
-data.requestID = requestID;
-data.samplingFrequency = fs.beide;
-clear requestID fs
-
-data.input.intervals = McRoberts_input.mainStruct.intervals;
-
-data.output.STSperiod = McRoberts_output.results.report.startEndSTS;
-data.output.shift_sec = verschuiving; % to be removed.
-data.output.database  = McRoberts_output.results.database;
-data.output.phases    = McRoberts_output.results.report.phases;
-clear verschuiving
-clear McRoberts_input McRoberts_output
-
-data.Opti.linear.v2 = Opti_linear.v2;
-data.Opti.linear.x2 = Opti_linear.x2; 
-data.Opti.angles.v2 = Opti_angles.v2;
-data.Opti.angles.x2 = Opti_angles.x2;
-clear Opti_linear Opti_angles
-clear MT_linear MT_angles
-
-   
 %% extract target trial part from the signal.
 %frames.All = McRoberts_output.results.report.startEndSTS(1)-(verschuiving*fs.beide):McRoberts_output.results.report.startEndSTS(2)-(verschuiving*fs.beide);
 frames.All = data.output.STSperiod(1)-(data.output.shift_sec*data.samplingFrequency)...
@@ -78,8 +38,7 @@ frames.All = round(frames.All);
             
 % bepaal de lengte van een periode en knip adhv de periode het
 % signaal wat smaller.
-%[indices, periode] = periode_bepaling(McRoberts_input.mainStruct.interval(1,5), frames.All, Opti_linear.v2(:,1));
-[indices, periode] = periode_bepaling(data.input.intervals(trialNum, 5), frames.All, data.Opti.linear.v2(:,1));
+[indices, periode] = periode_bepaling(trialName, frames.All, data.Opti.linear.v2(:,1));
 frames.All = signaal_knippen(periode, indices);
  
             
@@ -93,21 +52,15 @@ if exist('parameters','var') >= 1
 end
             
 % sta- en zithoogtes bepalen
-% [peaks, indices] = bepaal_stahoogtes(Opti_linear.x2, frames.All, periode);
-% [peaks, indices] = bepaal_zithoogtes(Opti_linear.x2, frames.All, periode, peaks, indices);
-% [peaks, indices] = index_correctie_zithoogte(Opti_linear.x2, frames.All, peaks, indices);
-% [peaks, indices] = index_correctie_stahoogte(peaks, indices);
 [peaks, indices] = bepaal_stahoogtes(data.Opti.linear.x2, frames.All, periode);
 [peaks, indices] = bepaal_zithoogtes(data.Opti.linear.x2, frames.All, periode, peaks, indices);
 [peaks, indices] = index_correctie_zithoogte(data.Opti.linear.x2, frames.All, peaks, indices);
 [peaks, indices] = index_correctie_stahoogte(peaks, indices);
 
 % bepaal de start en het einde van de staperiode op basis van de stahoogte
-%momenten_staan = staan_StartEnd(Opti_linear.x2(:,1), indices.stahoogte, indices.zithoogte, frames.All, drempelwaarde);
 momenten_staan = staan_StartEnd(data.Opti.linear.x2(:,1), indices.stahoogte, indices.zithoogte, frames.All, drempelwaarde);
 
 % bepaal de start en het einde van de zitperiode op basis van de zithoogte
-%momenten_zitten = zitten_StartEnd(Opti_linear.x2(:,1), indices.zithoogte, indices.stahoogte, frames.All, drempelwaarde);
 momenten_zitten = zitten_StartEnd(data.Opti.linear.x2(:,1), indices.zithoogte, indices.stahoogte, frames.All, drempelwaarde);
 
 % transitiemomenten bepalen.
@@ -116,7 +69,6 @@ parameters.Opti.TotaalStS = length(momenten_staan(1:2:length(momenten_staan),1))
 momenten.All = 0;
 frames.transitie = 0;
 for iFrame = 1:momenten_zitten(1:1)-frames.All(1)-1
-    %frames = nullijn_passage(frames, Opti_angles.v2(:,2), iFrame, draw);
     frames = nullijn_passage(frames, data.Opti.angles.v2(:,2), iFrame, draw);
 end
 momenten.All(1) = frames.transitie(end);
@@ -162,11 +114,9 @@ momenten.All(size(momenten.All,1)+1,1) = frames.transitie(transitieNr);
 parameters.Opti = splits_faseovergangen(parameters.Opti, momenten.All);
 
 % berekening Optitrack parameters
-%parameters.Opti = Opti_parameters_berekenen(parameters.Opti, McRoberts_output.results.report.startEndSTS(1), verschuiving, fs_beide);
 parameters.Opti = Opti_parameters_berekenen(parameters.Opti, data.output.STSperiod(1), data.output.shift_sec, data.samplingFrequency);
 
 % parameters inladen MT
-%parameters.MT = MoveTest_parameters_inladen(McRoberts_output.results.database, McRoberts_output.results.report.phases);
 parameters.MT = MoveTest_parameters_inladen(data.output.database, data.output.phases);
 
 
@@ -191,5 +141,4 @@ parameters.MT = MTcorrection(index, parameters.Opti.TotaalStS(1), parameters.MT,
 %             
             
 %% bepaal volgorde protocol
-%parameters.metadata = bepaal_protocolvolgorde(McRoberts_input.mainStruct.intervals);
 parameters.metadata = bepaal_protocolvolgorde(data.input.intervals);

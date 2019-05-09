@@ -1,10 +1,11 @@
-function data = workspace2data(requestID)
-% function data = workspace2data(requestID)
+function data = workspace2data(requestID, trialNum)
+% function data = workspace2data(requestID, trialNum)
 % load Sietze's workspace and return only relevant information for mt2opti 
 % as a struct 'data'.
 %
 % INPUT
 % - requestID
+% - trialNum
 % OUTPUT
 % - data (struct)
 % 
@@ -19,9 +20,14 @@ function data = workspace2data(requestID)
 %% read Hans work.
 settings_Sietze;
 
+% Sietze did his work assuming trialNum = 1.
 workspaceName = [dirWorkspace '\workspace' num2str(requestID)];
 load(workspaceName);
 
+% data of another trial numbers...
+filename = [dirMT '\' num2str(requestID) '\' num2str(requestID) '_movetest_ststest_' num2str(trialNum) '.mat'];
+McRoberts_input  = load(filename);
+McRoberts_output = load(strrep(filename, '.mat', '_results.mat'));
 
 % basic info
 data.requestID = requestID;
