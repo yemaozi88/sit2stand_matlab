@@ -8,13 +8,8 @@
 
 %% definition
 clear all, fclose all, clc;
-dirHansWork  = 'r:\Stagiaires\Sietze de Haan';
-dirMT        = 'r:\Stagiaires\Sietze de Haan\dataMT';
-dirOptitrack = 'r:\Stagiaires\Sietze de Haan\dataOptitrack';
-dirWorkspace = 'r:\Stagiaires\Sietze de Haan\workspaces';
-dirOut       = 'm:\Aki\Data\MachineLearning\from_Sietze\sts';
-
 loadRequestIDlist = 0;
+settings_Sietze;
 
 
 %% get the list of requestIDs
@@ -52,12 +47,23 @@ for requestID_ = 1:length(requestIDlist)
     workspaceName = [dirWorkspace '\workspace' num2str(requestID)];
     load(workspaceName);
 
+    % basic info
     data.requestID = requestID;
     data.t = t_opti2;
     data.shift = ...
         floor(graph_input(find(graph_input(:, 1)==requestID), 2) * fs.beide);
     data.samplingFrequency = fs.beide;
 
+    
+    % data from MAS
+    data.input.intervals  = McRoberts_input.mainStruct.intervals;
+    data.output.STSperiod = McRoberts_output.results.report.startEndSTS;
+    data.output.shift_sec = verschuiving; % to be removed.
+    data.output.database  = McRoberts_output.results.database;
+    data.output.phases    = McRoberts_output.results.report.phases;
+    
+    
+    % synced
     syncEnd = min(length(MT_angles.v), length(Opti_angles.v2));
     syncPeriod = 1:syncEnd;
 
@@ -69,11 +75,11 @@ for requestID_ = 1:length(requestIDlist)
     data.MT.angles.v = MT_angles.v(syncPeriod+data.shift, :);
     data.MT.angles.x = MT_angles.x(syncPeriod+data.shift, :);
 
-    data.Opti.linear.v = Opti_linear.v2;
-    data.Opti.linear.x = Opti_linear.x2;
+    data.Opti.linear.v2 = Opti_linear.v2;
+    data.Opti.linear.x2 = Opti_linear.x2;
 
-    data.Opti.angles.v = Opti_angles.v2;
-    data.Opti.angles.x = Opti_angles.x2;
+    data.Opti.angles.v2 = Opti_angles.v2;
+    data.Opti.angles.x2 = Opti_angles.x2;
     
     save([fileOut, '.mat'], 'data');       
     clear syncEnd syncPeriod
@@ -86,7 +92,7 @@ for requestID_ = 1:length(requestIDlist)
         ylabel('Sensor output', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
 
         plot(data.MT.angles.v(:, 2), 'k-', 'LineWidth', 2);
-        plot(data.Opti.angles.v(:, 2), 'r-', 'LineWidth', 2);    
+        plot(data.Opti.angles.v2(:, 2), 'r-', 'LineWidth', 2);    
         grid on
     %     xlim([0 5000])
         legend('MT angles v(2)', 'Opti angles v(2)');

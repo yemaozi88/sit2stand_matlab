@@ -19,10 +19,12 @@
 %
 
 %% default values
+clear all, fclose all, clc;
+
 requestID = 20121;
 trialNum  = 1;
 settings_Sietze;
-clear dirSietze fileRequestIDlist
+clear dirOut dirSietze fileRequestIDlist
 
 % threshold
 drempelwaarde = 0.04; % in meters
@@ -33,53 +35,42 @@ draw = [1 0 0];
 
 
 %% load data
-workspaceName = sprintf('workspace%d.mat',requestID);
-load([dirWorkspace '\' workspaceName]);
+load([dirWorkspace '\workspace' num2str(requestID) '.mat']);
+clear framenr graph_input row
+clear reqID_all iReqID
+clear resample_verhouding
+clear t_MT t_opti t_opti2
+clear coordinaten metadata
 
 filename = [dirMT '\' num2str(requestID) '\' num2str(requestID) '_movetest_ststest_' num2str(trialNum) '.mat'];
 McRoberts_input  = load(filename);
 McRoberts_output = load(strrep(filename, '.mat', '_results.mat'));
+clear dirMT dirWorkspace filename
 
-% make data structure
+
+%% make data structure
 data.requestID = requestID;
+data.samplingFrequency = fs.beide;
+clear requestID fs
+
+data.input.intervals = McRoberts_input.mainStruct.intervals;
 
 data.output.STSperiod = McRoberts_output.results.report.startEndSTS;
 data.output.shift_sec = verschuiving; % to be removed.
 data.output.database  = McRoberts_output.results.database;
 data.output.phases    = McRoberts_output.results.report.phases;
+clear verschuiving
+clear McRoberts_input McRoberts_output
 
-data.samplingFrequency = fs.beide;
-
-data.input.interval = McRoberts_input.mainStruct.interval;
-% clear framenr graph_input row
-% clear reqID_all iReqID
-% clear fs resample_verhouding
-% clear t_MT t_opti t_opti2
-% 
-% clear filename
-% clear coordinaten
-% 
-% 
-% syncEnd = min(length(MT_angles.v), length(Opti_angles.v2));
-% syncPeriod = 1:syncEnd;
-% 
-% data.MT.linear.a = MT_linear.a(syncPeriod+data.shift, :);
-% data.MT.linear.v = MT_linear.v(syncPeriod+data.shift, :);
-% data.MT.linear.x = MT_linear.x(syncPeriod+data.shift, :);
-% 
-% data.MT.angles.a = MT_angles.a(syncPeriod+data.shift, :);
-% data.MT.angles.v = MT_angles.v(syncPeriod+data.shift, :);
-% data.MT.angles.x = MT_angles.x(syncPeriod+data.shift, :);
-% 
-%data.Opti.linear.v  = Opti_linear.v;
 data.Opti.linear.v2 = Opti_linear.v2;
-data.Opti.linear.x2 = Opti_linear.x2;
- 
+data.Opti.linear.x2 = Opti_linear.x2; 
 data.Opti.angles.v2 = Opti_angles.v2;
 data.Opti.angles.x2 = Opti_angles.x2;
-    
-    
-% extract target trial part from the signal.
+clear Opti_linear Opti_angles
+clear MT_linear MT_angles
+
+   
+%% extract target trial part from the signal.
 %frames.All = McRoberts_output.results.report.startEndSTS(1)-(verschuiving*fs.beide):McRoberts_output.results.report.startEndSTS(2)-(verschuiving*fs.beide);
 frames.All = data.output.STSperiod(1)-(data.output.shift_sec*data.samplingFrequency)...
     :data.output.STSperiod(2)-(data.output.shift_sec*data.samplingFrequency);
@@ -88,11 +79,11 @@ frames.All = round(frames.All);
 % bepaal de lengte van een periode en knip adhv de periode het
 % signaal wat smaller.
 %[indices, periode] = periode_bepaling(McRoberts_input.mainStruct.interval(1,5), frames.All, Opti_linear.v2(:,1));
-[indices, periode] = periode_bepaling(data.input.interval(1,5), frames.All, data.Opti.linear.v2(:,1));
+[indices, periode] = periode_bepaling(data.input.intervals(trialNum, 5), frames.All, data.Opti.linear.v2(:,1));
 frames.All = signaal_knippen(periode, indices);
  
             
-%% parameter detectie
+%% parameter detectief
 % verwijder variabelen bij de analyse van een volgend protocolonderdeel
 if exist('parameters','var') >= 1
     clear parameters
@@ -200,4 +191,5 @@ parameters.MT = MTcorrection(index, parameters.Opti.TotaalStS(1), parameters.MT,
 %             
             
 %% bepaal volgorde protocol
-parameters.metadata = bepaal_protocolvolgorde(McRoberts_input.mainStruct.intervals);
+%parameters.metadata = bepaal_protocolvolgorde(McRoberts_input.mainStruct.intervals);
+parameters.metadata = bepaal_protocolvolgorde(data.input.intervals);

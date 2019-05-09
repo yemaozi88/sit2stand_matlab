@@ -16,6 +16,7 @@ dirSietze = 'r:\Stagiaires\Sietze de Haan';
 dirOut = 'm:\Aki\Data\MachineLearning\from_Sietze\sts';
 
 dirMT        = [dirSietze '\dataMT'];
+dirOptitrack = [dirSietze '\dataOptitrack'];
 dirWorkspace = [dirSietze '\workspaces'];
 
 fileRequestIDlist = [dirOut '\requestIDlist.mat'];
