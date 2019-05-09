@@ -19,4 +19,7 @@ dirMT        = [dirSietze '\dataMT'];
 dirOptitrack = [dirSietze '\dataOptitrack'];
 dirWorkspace = [dirSietze '\workspaces'];
 
+dirGoldStandard = [dirOut '\parameters\goldstandard'];
+dirSynced       = [dirOut '\synced'];
+
 fileRequestIDlist = [dirOut '\requestIDlist.mat'];

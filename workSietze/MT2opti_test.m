@@ -6,21 +6,17 @@
 % 428968@gmail.com
 %
 clear all, fclose all, clc;
+settings_Sietze;
 
-dirIn  = 'm:\Aki\Data\MachineLearning\from_Sietze\sts\parameters';
-dirOut = 'm:\Aki\Data\MachineLearning\from_Sietze\sts';
 
+%% load data
 requestID = 20121;
-trialNum  = 2; 
-
-parameters1 = makeGoldStandard_Sietze(requestID, trialNum);
-
-fileSync = [dirOut '\synced\', num2str(requestID)];
-load([fileSync '.mat']);
+trialNum = 1;
+load([dirGoldStandard '\' num2str(requestID) '_' num2str(trialNum) '.mat']);
+load([dirSynced '\' num2str(requestID) '_' num2str(trialNum) '.mat']);
 trialName = data.input.intervals(trialNum, 5);
-parameters2 = makeGoldStandard(data, trialName);
 
-
+dispSit2StandPhase(data, trialName, parameters);
 
 % load([dirIn '\goldstandard\20121_2.mat']);
 % p1 = parameters;
