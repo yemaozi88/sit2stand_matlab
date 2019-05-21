@@ -26,7 +26,16 @@ dataNum_train = 6000;
 
 dispSampleNum = 1;
 
-%doPCA = 0;
+% 0: no normalization
+% 1: load mu and sigma
+% 2: calculate zscore
+doNormalization = 2;
+
+% 0: no PCA
+% 1: load mu and eigen values
+% 2: calculate PCA
+doPCA = 2;
+PCAdeg = 5;
 
 
 %% load data
@@ -214,34 +223,83 @@ if dispSampleNum
 end 
 
 
-% %% normalize data
-% if 0
-%     try
-%         load([dirMat '\z_mu.mat']);
-%         load([dirMat '\z_sigma.mat']);
-% 
-%         z_mu    = z_mu';
-%         z_sigma = z_sigma';
-%     
-%         X = X - z_mu ./ z_sigma
-%     catch
-%         warning('mu and/or sigma cannot be loaded. feature is not normalized.');
-%     end
-% end
-% 
-% 
-% %% PCA
-% if 0
-%     try
-%         load([dirMat '\Evec.mat']);
-%         load([dirMat '\u.mat']);
-%         X = PCA_Trans(X, Evec, u, PCAdeg);
-%     catch
-%         warning('Evec and/or u cannot be loaded. PCA is not performed.\n');
-%     end
-% end % end
-% errorFeatures = X;
+%% normalize data
+switch doNormalization
+    case 1
+        try
+            load([dirMat '\z_mu.mat']);
+            load([dirMat '\z_sigma.mat']);
+        catch
+            warning('mu and/or sigma cannot be loaded. feature is not normalized.');
+        end % try
+    case 2
+        [~, z_mu, z_sigma] = zscore(As{1}(:, 4:end));
+        save([dirMat '\z_mu.mat'], 'z_mu');
+        save([dirMat '\z_sigma.mat'], 'z_sigma');
+end % switch
+if doNormalization == 1 || doNormalization == 2
+    fprintf('\ndata is normalized.\n');
+    for i = 1:3
+        Az = As{i}(:, 4:end) - z_mu ./ z_sigma;
+        Azs{i} = [As{i}(:, 1:3), Az];
+    end
+    As = Azs;
+    clear i Az Azs
+end
+ 
 
+%% PCA
+switch doPCA
+    case 1
+        try
+            load([dirMat '\Evec.mat']);
+            load([dirMat '\Eval.mat']);
+            load([dirMat '\u.mat']);
+        catch
+            warning('Evec and/or u cannot be loaded. PCA is not performed.\n');
+        end 
+    case 2
+        [Evec, Eval, u] = calcPCA(As{1}(:, 4:end));
+        save([dirMat '\Evec.mat'], 'Evec');
+        save([dirMat '\Eval.mat'], 'Eval');
+        save([dirMat '\u.mat'], 'u');
+    
+        % energy occupancy
+        EvalNorm = Eval ./ sum(Eval) * 100;
+        idx = 1:length(EvalNorm);
+        EvalCumsum = cumsum(EvalNorm);
+        EvalCumsumIdx = [idx', EvalCumsum];
+
+        % plot - EvalCumsum
+        if 0
+            figure('visible', 'off');
+            hold on
+                xlabel('Number of PC', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
+                ylabel('Energy occupancy', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
+
+                fh = plot(EvalCumsum, 'ko-', 'MarkerSize', 3, 'LineWidth', 2);
+                grid;
+                %xlim([0 30])
+                %ylim([0 100])
+                set(gca, 'FontName', 'Arial', 'FontSize', 14);
+
+                saveas(fh, [dirFig '\PCA_VariableNum.fig']);
+                saveas(fh, [dirFig '\PCA_VariableNum.png']);
+            hold off
+            clear fh
+        end 
+end % switch
+if doPCA ~= 0
+    fprintf('\nPCA is performed.\n');
+end
+for setNum = 1:3
+    if doPCA == 1 || doPCA == 2
+        
+        X{setNum} = PCA_Trans(As{setNum}(:, 4:end), Evec, u, PCAdeg);
+    else
+        X{setNum} = As{setNum}(:, 4:end);
+    end % doPCA
+end % setNum
 
 
 % % =============== ITERATION ===============
@@ -259,43 +317,7 @@ end
 % 
 % 
 % %% train GMM
-% if doPCA
-%     [Evec, Eval, u] = PCA(X{1});
-%     save([dirMat '\Evec.mat'], 'Evec');
-%     save([dirMat '\Eval.mat'], 'Eval');
-%     save([dirMat '\u.mat'], 'u');
-%     
-%     % energy occupancy
-%     EvalNorm = Eval ./ sum(Eval) * 100;
-%     idx = 1:length(EvalNorm);
-%     EvalCumsum = cumsum(EvalNorm);
-%     EvalCumsumIdx = [idx', EvalCumsum];
-%     %disp('- energy occupancy');
-%     %disp(EvalCumsumIdx(1:137, :));
-%     
-%     % plot - EvalCumsum
-%     if 0
-%         figure('visible', 'on');
-%         hold on
-%             xlabel('Number of PC', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
-%             ylabel('Energy occupancy', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
-% 
-%             fh = plot(EvalCumsum, 'ko-', 'MarkerSize', 3, 'LineWidth', 2);
-%             grid;
-%             xlim([0 30])
-% %             ylim([0 100])
-%             set(gca, 'FontName', 'Arial', 'FontSize', 14);
-% 
-%             saveas(fh, [dirFig '\PCA_VariableNum.fig']);
-%             saveas(fh, [dirFig '\PCA_VariableNum.png']);
-%         hold off
-%         clear fh
-%     end 
-%     
-%     for setNum = 1:3
-%         X{setNum} = PCA_Trans(X{setNum}, Evec, u, dim);
-%     end % setNum
-% end % doPCA
+
 % 
 % obj = trainGMM(X{1}, mixNum, 1);
 % save([dirMat '\obj_dim' num2str(dim) '_mix' num2str(mixNum) '.mat'], 'obj');
