@@ -1,5 +1,5 @@
-% function errorFeatures = extractErrorFeatures(data, doNormalize, doPCA)
-% function errorFeatures = extractErrorFeatures(data, doNormalize, doPCA) 
+function errorFeatures = extractErrorFeatures(results)
+% function errorFeatures = extractErrorFeatures(results) 
 % extract features which can be used for error analysis.
 %
 % INPUT:
@@ -9,41 +9,33 @@
 % this function is intended for simplified data from Bas.
 % 
 % HISTORY
+% 2019/05/20 modified so that mainStruct and result will be taken as
+% arguments.
 % 2019/01/03 functionized.
 % 
 % AUTHOR
 % Aki Kunikoshi
-% 428968@gmail.com
+% a.kunikoshi@gmail.com
 %
+
+settings_Sit2Stand;
 
 
 %% test
-clear all, fclose all, clc;
-requestID = 10623;
-trialNum = 2;
+% %clear all, fclose all, clc;
+% requestID = 10623;
+% trialNum = 2;
+% %filename = [num2str(requestID) '_' num2str(trialNum)];
+% %load([dirSimplifiedData '\' filename '.mat']);
+% [mainStruct, results] = loadSit2StandSignal(requestID, trialNum);
 
 
-
-%% definition
-settings_Sit2Stand;
-
-filename = [num2str(requestID) '_' num2str(trialNum)];
-load([dirSimplifiedData '\' filename '.mat']);
-
-% % frequency analysis
-% samplingFrequency = 100;
-% ppHz = 10;
-% cutoff = 10;
-settings_Sit2Stand;
-
-    
-%% set variables
-signal = [data.resultVelocity, data.resultFlexionAngle];
-
-
-%% error features
-axisNumMax = size(signal, 2);
-phaseNumMax = size(data.resultPhases, 1);
+%% load signal
+axisNum = 1;
+signal = [results.report.velocityVT, ...
+    results.report.angle];
+phases = results.report.phases;
+phaseNumMax = size(phases, 1);
  
 % as of the Slack message from Bas on 2018/11/29.
 % phases
@@ -59,20 +51,18 @@ SiStEnd   = phases(:, 3);
 % StSiStart = phases(:, 4);
 % StSiEnd   = phases(:, 6);
 
+
+%% error features
+SiSt = results.database.SitToStand;
+StSi = results.database.StandToSit;
+
+X = [];
+for p = 1:phaseNumMax
+    similarity = getSignalSimilarity(...
+        signal(SiStStart(1):SiStEnd(1), axisNum), ...
+        signal(SiStStart(p):SiStEnd(p), axisNum));
     
-%     % peak location.
-%     % one repetition should take more than 0.5 sec. 
-%     [peaks, locations] = findpeaks(signal, t, 'MinPeakProminence', 1);
-%     tMax = size(signal, 1);
-%     t = 1:tMax;
-%     t = t';
-% % sit_duration is removed, because the matrix is sometimes empty.
-%         if isempty(StSi.sit_duration)
-%             sit_duration = 0;
-%         else
-%             sit_duration = StSi.sit_duration;
-%         end  
-    X = [X;
+    X = [X; ...
         SiSt.total_duration(p), ...
         SiSt.flexion_duration(p), ...
         SiSt.extension_duration(p), ...
@@ -99,56 +89,11 @@ SiStEnd   = phases(:, 3);
         StSi.peak_power(p), ...
         StSi.time_to_peak_power(p), ...
         StSi.rate_of_power_development(p), ...
-        StSi.peak_rate_of_power_development(p), ...  
+        StSi.peak_rate_of_power_development(p), ...
         similarity
         ];
-end % phase 
-    
-%     % peak location.
-%     % one repetition should take more than 0.5 sec. 
-%     [peaks, locations] = findpeaks(signal, t, 'MinPeakProminence', 1);
-%     tMax = size(signal, 1);
-%     t = 1:tMax;
-%     t = t';
-% 
-%     dispSit2StandSignal(requestID, trialNum, axisNum);
-%     hold on
-%     plot(locations, signal(locations), 'bo');
-
-
-%% normalize data
-if doNormalize
-    try
-        load([dirMat '\z_mu.mat']);
-        load([dirMat '\z_sigma.mat']);
-
-        z_mu    = z_mu';
-        z_sigma = z_sigma';
-    
-        X = X - z_mu ./ z_sigma
-    catch
-        warning('mu and/or sigma cannot be loaded. feature is not normalized.');
-    end
 end
+clear similarity
 
-
-%% PCA
-if doPCA
-    try
-        load([dirMat '\Evec.mat']);
-        load([dirMat '\u.mat']);
-        X = PCA_Trans(X, Evec, u, PCAdeg);
-    catch
-        warning('Evec and/or u cannot be loaded. PCA is not performed.\n');
-    end
-end % end
-
-
-errorFeatures = X;
-
-
-dispSit2StandSignal(requestID, trialNum, axisNum);
-%     hold on
-%     plot(locations, signal(locations), 'bo');
 
 errorFeatures = X;

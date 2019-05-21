@@ -10,15 +10,8 @@ function data = extractTargetSignal(requestID, trialNum)
 %
 % AUTHOR
 % Aki Kunikoshi
-% 428968@gmail.com
+% a.kunikoshi@gmail.com
 %
-
-
-
-%% test
-% clear all, fclose all, clc;
-% requestID = 16823;
-% trialNum  = 2;
 
 
 %% load signal

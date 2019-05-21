@@ -14,7 +14,8 @@
 %% definition
 dirData  = 't:\Data_PPT_Performance';
 
-dirMain           = 'c:\Users\A.Kunikoshi\OneDrive - McRoberts\Projects\Sit2Stand';
+%dirMain           = 'c:\Users\A.Kunikoshi\OneDrive - McRoberts\Projects\Sit2Stand';
+dirMain = 'e:\McRoberts\OneDrive\Projects\Sit2Stand';
 dirSimplifiedData = [dirMain '\SimplifiedData'];
 dirFig            = [dirMain '\fig'];
 dirMat            = [dirMain '\mat'];

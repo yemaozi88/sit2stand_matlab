@@ -4,7 +4,7 @@
 %
 % AUTHOR
 % Aki Kunikoshi
-% 428968@gmail.com
+% a.kunikoshi@gmail.com
 %
 
 clear all, fclose all, clc;
