@@ -15,10 +15,10 @@ clear cutoffFrequency frameShift pointPerHz windowSize
 clear dirHTK phaseList
 clear filePPToverview dirPPT
 
-extractFeature = 0;
+extractErrorFeature = 0;
 
 % 0: load
-% 1: per measurement
+% 1: per phase
 % 2: per trial
 splitTrainCVTest = 0;
 % used only when splitTrainCVTest = 1
@@ -29,17 +29,20 @@ dispSampleNum = 1;
 % 0: no normalization
 % 1: load mu and sigma
 % 2: calculate zscore
-doNormalization = 2;
+doNormalization = 1;
 
 % 0: no PCA
 % 1: load mu and eigen values
 % 2: calculate PCA
-doPCA = 2;
-PCAdeg = 5;
+doPCA = 0;
+PCAdim = 7;
+if doPCA == 0
+    PCAdim = 0;
+end
 
 
 %% load data
-if extractFeature
+if extractErrorFeature
     load(fileErrorKindTable);
     clear fileErrorKindTable
     
@@ -60,6 +63,8 @@ if extractFeature
         X_ = extractErrorFeatures(results);
         X  = [X; X_];
         y_ = repmat(errorKindTable(i, :), size(X_, 1), 1);
+        % add phase num.
+        y_ = [y_, (1:size(X_, 1))']; 
         y  = [y; y_];
         toc
     end % i
@@ -78,18 +83,31 @@ end % extractFeature
 clear extractFeature
 
 
-%% make train/cv/test data
-% A - n x (3+28)
+%% clean data
+% A - n x (4+31)
 % - col1: requestID
 % - col2: trialNum
-% - col3: errorKind
+% - col3: phaseNum
+% - col4: errorKind
 %       error kind 1: 276 samples.
 %       error kind 2: 8 samples.
 %       error kind 3: 6475 samples.
 % - col4-end: feature
-A = [y, X];
-clear X y 
+A = [y(:, 1:2), y(:, 4), y(:, 3), X(:, 1:end)];
+clear X y
 
+% remove unknown errors.
+%   1: analysis error - 264
+%   2: user error - 8
+%   3: correct analysis - 6379
+%   4: analysis failed - 0
+%   5: dont know - 46
+fprintf('\nremoving unknown errors...\n');
+A(find(A(:, 4) == 5), :) = [];
+
+    
+    
+%% make train/cv/test data
 tic
 fprintf('train/cv/test data ');
 
@@ -99,21 +117,21 @@ switch splitTrainCVTest
         clear dataNum_train
         load([dirMat '\A_train_cv_test.mat']);
 
-    case 1 % per measurement
-        fprintf('is made per measurement.\n');
-        % number of measurements
+    case 1 % per phase.
+        fprintf('is made per phase.\n');
+        % number of phase
         % - control: 6379 (train 6000 + cv/test 379)
         % - error: 318
-        dataNum_cv0   = floor(size(find(A(:, 3)==3))/2);
-        dataNum_cv1   = floor(size(find(A(:, 3)~=3))/2);
+        dataNum_cv0   = floor(size(find(A(:, 4)==3))/2);
+        dataNum_cv1   = floor(size(find(A(:, 4)~=1))/2);
 
         % correctly analysed.
-        idx = find(A(:, 3) == 3);
+        idx = find(A(:, 4) == 3);
         A_0 = A(idx, :);
         clear idx
 
         % analysis failed.
-        idx = find(A(:, 3) ~= 3);
+        idx = find(A(:, 4) == 1);
         A_1 = A(idx, :);
         clear idx
 
@@ -152,13 +170,14 @@ switch splitTrainCVTest
         
         % unique requestID + trialID
         [~, iUniqueTrials, ~] = unique(A(:, 1:2), 'rows');
-        iA_ = A(iUniqueTrials, 1:3);
+        iA_ = A(iUniqueTrials, 1:4);
         clear iUniqueTrials
     
         % successfully analysed.
-        iA_0 = iA_(iA_(:, 3)==3, :);
+        iA_0 = iA_(iA_(:, 4)==3, :);
         % problem analysing data.
-        iA_1 = setdiff(iA_, iA_0, 'rows'); 
+        %iA_1 = setdiff(iA_, iA_0, 'rows'); 
+        iA_1 = iA_(iA_(:, 4)==1, :);
 
         % split into train/cv/test data.
         [iA_train, iA_train_] = splitTrainTest(iA_0, 0.8);
@@ -187,6 +206,7 @@ switch splitTrainCVTest
             end
             clear i data_ a
             As{setNum} = data;
+            
             %info{setNum} = data(:, 1:3);
             %y{setNum} = data(:, 4);
             %X{setNum} = data(:, 5:end);
@@ -207,10 +227,10 @@ if dispSampleNum
     dataNum_cv    = size(A_cv, 1);
     dataNum_test  = size(A_test, 1); 
 
-    dataNum_cv0 = size(find(A_cv(:, 3) == 3), 1);
-    dataNum_cv1 = size(find(A_cv(:, 3) ~= 3), 1);
-    dataNum_test0 = size(find(A_test(:, 3) == 3), 1);
-    dataNum_test1 = size(find(A_test(:, 3) ~= 3), 1);
+    dataNum_cv0 = size(find(A_cv(:, 4) == 3), 1);
+    dataNum_cv1 = size(find(A_cv(:, 4) ~= 3), 1);
+    dataNum_test0 = size(find(A_test(:, 4) == 3), 1);
+    dataNum_test1 = size(find(A_test(:, 4) ~= 3), 1);
 
     fprintf('\n')
     disp(['train data has ' num2str(dataNum_train) ' measurements (all control).']);
@@ -221,6 +241,11 @@ if dispSampleNum
     clear dataNum_cv0 dataNum_cv1 dataNum_test0 dataNum_test1
     clear A_train A_cv A_test
 end 
+
+for i = 1:3
+    y{i} = As{i}(:, 1:4);
+    X{i} = As{i}(:, 5:end);
+end
 
 
 %% normalize data
@@ -233,20 +258,19 @@ switch doNormalization
             warning('mu and/or sigma cannot be loaded. feature is not normalized.');
         end % try
     case 2
-        [~, z_mu, z_sigma] = zscore(As{1}(:, 4:end));
+        [~, z_mu, z_sigma] = zscore(X{1});
         save([dirMat '\z_mu.mat'], 'z_mu');
         save([dirMat '\z_sigma.mat'], 'z_sigma');
 end % switch
 if doNormalization == 1 || doNormalization == 2
     fprintf('\ndata is normalized.\n');
     for i = 1:3
-        Az = As{i}(:, 4:end) - z_mu ./ z_sigma;
-        Azs{i} = [As{i}(:, 1:3), Az];
+        X{i} = X{i} - z_mu ./ z_sigma;
     end
-    As = Azs;
-    clear i Az Azs
+    clear i
 end
- 
+clear z_mu z_sigma
+
 
 %% PCA
 switch doPCA
@@ -259,7 +283,7 @@ switch doPCA
             warning('Evec and/or u cannot be loaded. PCA is not performed.\n');
         end 
     case 2
-        [Evec, Eval, u] = calcPCA(As{1}(:, 4:end));
+        [Evec, Eval, u] = calcPCA(X{1});
         save([dirMat '\Evec.mat'], 'Evec');
         save([dirMat '\Eval.mat'], 'Eval');
         save([dirMat '\u.mat'], 'u');
@@ -271,7 +295,7 @@ switch doPCA
         EvalCumsumIdx = [idx', EvalCumsum];
 
         % plot - EvalCumsum
-        if 0
+        if 1
             figure('visible', 'off');
             hold on
                 xlabel('Number of PC', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
@@ -289,96 +313,92 @@ switch doPCA
             clear fh
         end 
 end % switch
-if doPCA ~= 0
+if doPCA == 1 || doPCA == 2
     fprintf('\nPCA is performed.\n');
-end
-for setNum = 1:3
-    if doPCA == 1 || doPCA == 2
-        
-        X{setNum} = PCA_Trans(As{setNum}(:, 4:end), Evec, u, PCAdeg);
-    else
-        X{setNum} = As{setNum}(:, 4:end);
+    for i = 1:3
+        X{i} = PCA_Trans(X{i}, Evec, u, PCAdim);
     end % doPCA
+    clear i
 end % setNum
+clear Evec Eval u
 
 
-% % =============== ITERATION ===============
-% %  7: 80.1964
-% % 11: 90.2501
-% % 15: 95.4386
-% % 21: 99.3237
-% Result_cv   = [];
-% Result_test = [];
-% for dim = [7, 14, 21, 28, 35]
-%     for mixNum = [1, 4, 16, 64, 256]
-%         disp(['dim:' num2str(dim) ' mix: ' num2str(mixNum)]);
-% % =============== ITERATION ===============
-% 
-% 
-% 
-% %% train GMM
+%% make GMM
+Result_cv   = [];
+Result_test = [];
+%for mixNum = [4, 16, 64, 256]
+for mixNum = [4, 16, 64, 256, 512, 1024, 2048]
+    % train GMM
+    tic
+    obj = trainGMM(X{1}, mixNum, 1);
+    toc
+    %save([dirMat '\obj_dim' num2str(PCAdim) '_mix' num2str(mixNum) '.mat'], 'obj');
+    save([dirMat '\obj_mix' num2str(mixNum) '.mat'], 'obj');
 
-% 
-% obj = trainGMM(X{1}, mixNum, 1);
-% save([dirMat '\obj_dim' num2str(dim) '_mix' num2str(mixNum) '.mat'], 'obj');
-% 
-% 
-% %% performance in cv
-% for setNum = 2:3
-%     info_ = info{setNum};
-%     X_    = X{setNum};
-%     y_    = y{setNum};
-%     uniqueTrials = unique(info_(:, 1:2), 'rows');
-%     probability = [];
-%     answers = [];
-%     %hold on
-%     for n = 1:size(uniqueTrials, 1)
-%         idx = find(info_(:, 1) == uniqueTrials(n, 1) & info_(:, 2) == uniqueTrials(n, 2));
-%         % for all phases
-%         x = X_(idx, :);
-%         prob = pdf(obj, x);
-%         errorNum = unique(y_(idx));
-%         probability = [probability; mean(prob)];
-%         answers     = [answers; errorNum];
-%     %     if errorNum == 3
-%     %         %plot(prob, 'bo-', 'LineWidth', 2);
-%     %         scatter(0, mean(prob), 'bo');
-%     %     else
-%     %         %plot(prob, 'ro-', 'LineWidth', 2);
-%     %         scatter(1, mean(prob), 'ro');
-%     %     end % errorNum
-%         %ylim([0, 0.0005]);
-%     end % n
-%     %hold off
-%     clear idx n
-% 
-%     % threshold
-%     if setNum == 2
-%         threshold = max(probability(find(probability(:, 1)~=3, 1)));
-%     end % if
-%     
-%     predictions = probability<threshold;
-%     answers_ = answers~=3;
-%     [results, resultsVector] = calcPerformance(predictions, answers_);
-%     
-%     fprintf('\n');
-%     result_ = [dim, mixNum, resultsVector];
-%     switch setNum
-%         case 2
-%             %disp('<< performance in CV set >>');
-%             Result_cv   = [Result_cv; result_];
-%         case 3
-%             %disp('<< performance in CV set >>');
-%             Result_test = [Result_test; result_];
-%     end % switch
-%     
-%     %results
-% end % setNum
-% 
-% 
-% % =============== ITERATION ===============
-%     end % mixNum
-% end % dim
-% save([dirMat '\Result_cv.mat'], 'Result_cv');
-% save([dirMat '\Result_test.mat'], 'Result_test');
-% % =============== ITERATION ===============
+    % performance in cv / test
+    for i = 2:3
+        X_ = X{i};
+        y_ = y{i};
+        uniqueTrials = unique(y_(:, 1:2), 'rows');
+        probability = [];
+        answers = [];
+        for n = 1:size(uniqueTrials, 1)
+            idx = find(y_(:, 1) == uniqueTrials(n, 1) & y_(:, 2) == uniqueTrials(n, 2));
+            % for all phases
+            x = X_(idx, :);
+            prob = pdf(obj, x);
+            errorNum = unique(y_(idx, 4));
+            probability = [probability; mean(prob)];
+            answers     = [answers; errorNum];
+        end % n
+        clear idx prob x
+        clear n uniqueTrials
+
+        % threshold
+        if i == 2
+            threshold = max(probability(find(answers(:, 1)~=3, 1)));
+            save([dirMat '\threshold_mix' num2str(mixNum) '.mat'], 'threshold');
+        else
+            load([dirMat '\threshold_mix' num2str(mixNum) '.mat']);
+        end % if
+
+        predictions = probability<threshold;
+        answers_ = answers~=3;
+        [results, resultsVector] = calcPerformance(predictions, answers_);
+        fprintf('\ndim: %d, mix: %d, F1score: %f\n', ...
+            PCAdim, mixNum, results.F1);
+        
+        result_ = [PCAdim, mixNum, resultsVector];
+        switch i
+            case 2
+                %disp('<< performance in CV set >>');
+                Result_cv   = [Result_cv; result_];
+            case 3
+                %disp('<< performance in CV set >>');
+                Result_test = [Result_test; result_];
+        end % switch
+
+        %results
+    end % setNum
+
+end % mixNum
+save([dirMat '\Result_cv.mat'], 'Result_cv');
+save([dirMat '\Result_test.mat'], 'Result_test');
+
+
+% plot
+if 1
+    figure('visible', 'on');
+    hold on
+        fh = semilogx(Result_test(:, 2), Result_test(:, 7), 'ko-', 'MarkerSize', 3, 'LineWidth', 2);
+        grid;
+        xlabel('Number of mixtures', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
+        ylabel('F1 score', 'FontName', 'Arial', 'FontSize', 20, 'FontWeight', 'bold');
+        xlim([0 2048])
+        set(gca, 'FontName', 'Arial', 'FontSize', 14);
+        
+        saveas(fh, [dirFig '\F1-mixNum.fig']);
+        saveas(fh, [dirFig '\F1-mixNum.png']);
+    hold off
+    clear fh    
+end % if

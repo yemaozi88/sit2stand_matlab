@@ -23,7 +23,7 @@ function dispErrorSample(errorKind, axisNum)
 %
 % AUTHOR
 % Aki Kunikoshi
-% 428968@gmail.com
+% a.kunikoshi@gmail.com
 %
 
 

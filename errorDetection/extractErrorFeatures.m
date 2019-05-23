@@ -2,11 +2,10 @@ function errorFeatures = extractErrorFeatures(results)
 % function errorFeatures = extractErrorFeatures(results) 
 % extract features which can be used for error analysis.
 %
-% INPUT:
+% INPUT
 % - results: MAS analysis results of Sit-to-Stand test.
-%
-% NOTES:
-% this function is intended for simplified data from Bas.
+% OUTPUT
+% - errorFeatures: feature sets which to be used in anomalyDetection.
 % 
 % HISTORY
 % 2019/05/20 modified so that mainStruct and result will be taken as
@@ -21,17 +20,7 @@ function errorFeatures = extractErrorFeatures(results)
 settings_Sit2Stand;
 
 
-%% test
-% %clear all, fclose all, clc;
-% requestID = 10623;
-% trialNum = 2;
-% %filename = [num2str(requestID) '_' num2str(trialNum)];
-% %load([dirSimplifiedData '\' filename '.mat']);
-% [mainStruct, results] = loadSit2StandSignal(requestID, trialNum);
-
-
 %% load signal
-axisNum = 1;
 signal = [results.report.velocityVT, ...
     results.report.angle];
 phases = results.report.phases;
@@ -58,9 +47,14 @@ StSi = results.database.StandToSit;
 
 X = [];
 for p = 1:phaseNumMax
-    similarity = getSignalSimilarity(...
-        signal(SiStStart(1):SiStEnd(1), axisNum), ...
-        signal(SiStStart(p):SiStEnd(p), axisNum));
+    similarity = [];
+    for axisNum = 1:size(signal, 2)
+        similarity_ = getSignalSimilarity(...
+            signal(SiStStart(1):SiStEnd(1), axisNum), ...
+            signal(SiStStart(p):SiStEnd(p), axisNum));
+        similarity = [similarity, similarity_];
+    end
+    clear axisNum similarity_
     
     X = [X; ...
         SiSt.total_duration(p), ...
@@ -94,6 +88,5 @@ for p = 1:phaseNumMax
         ];
 end
 clear similarity
-
 
 errorFeatures = X;
